@@ -8,7 +8,8 @@
 
     <!-- Developer options prompt -->
     <string name="enable_title">Enable mock locations</string>
-    <string name="enable_body">Android only lets an app set a fake position once you pick it by hand.\n\nIn Developer options, tap <b>Select mock location app</b> and choose OpenSpoof, then come back.</string>
+    <string name="enable_body">Android only lets an app set a fake position once you pick it by hand.</string>
+    <string name="enable_step">In Developer options, tap \"Select mock location app\" and choose OpenSpoof.</string>
     <string name="enable_hint">Developer options hidden? Open Settings → About phone and tap the build number seven times.</string>
     <string name="enable_open">Open developer options</string>
     <string name="enable_later">Not now</string>
