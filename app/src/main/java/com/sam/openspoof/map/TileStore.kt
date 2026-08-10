@@ -52,6 +52,39 @@ class TileStore(context: Context, private val scope: CoroutineScope) {
     private val fetchLimit = Semaphore(MAX_PARALLEL_FETCHES)
     private val inFlight = HashSet<Long>()
 
+    /** The tile rectangle currently on screen, republished by the renderer each frame. */
+    @Volatile
+    private var viewport: Viewport? = null
+
+    private class Viewport(
+        val zoom: Int,
+        val minX: Int,
+        val maxX: Int,
+        val minY: Int,
+        val maxY: Int,
+        val axis: Int,
+    )
+
+    /**
+     * Tells the store what is currently on screen, so queued downloads for tiles the camera has
+     * since left can be abandoned instead of fetched.
+     */
+    fun setViewport(zoom: Int, minX: Int, maxX: Int, minY: Int, maxY: Int, axis: Int) {
+        viewport = Viewport(zoom, minX, maxX, minY, maxY, axis)
+    }
+
+    private fun stillWanted(z: Int, x: Int, y: Int): Boolean {
+        val view = viewport ?: return true
+        if (view.zoom != z || y < view.minY || y > view.maxY) return false
+        // Columns are stored wrapped, while the visible range may run past the antimeridian,
+        // so the range is walked rather than compared directly.
+        if (view.maxX - view.minX + 1 >= view.axis) return true
+        for (column in view.minX..view.maxX) {
+            if (Math.floorMod(column, view.axis) == x) return true
+        }
+        return false
+    }
+
     /**
      * Bumped whenever a tile becomes available. The map Canvas reads this so a newly decoded
      * tile triggers exactly one recomposition instead of the map polling for arrivals.
@@ -80,7 +113,14 @@ class TileStore(context: Context, private val scope: CoroutineScope) {
         synchronized(inFlight) { if (!inFlight.add(key)) return }
 
         scope.launch(Dispatchers.IO) {
-            val bitmap = readFromDisk(z, x, y) ?: fetchLimit.withPermit { download(z, x, y) }
+            val bitmap = readFromDisk(z, x, y) ?: fetchLimit.withPermit {
+                // Downloads queue behind a small number of permits, and a fly-to can sweep the
+                // camera across thousands of tiles before the queue drains. Re-checking here
+                // means only tiles still on screen are actually fetched, which keeps the map
+                // responsive and keeps the app from scanning a wide area of the tile server,
+                // something the usage policy calls out specifically.
+                if (stillWanted(z, x, y)) download(z, x, y) else null
+            }
             synchronized(inFlight) { inFlight.remove(key) }
             if (bitmap != null) {
                 memory.put(key, bitmap)

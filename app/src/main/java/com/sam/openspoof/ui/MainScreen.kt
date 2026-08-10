@@ -143,7 +143,9 @@ fun MainScreen() {
         OsmMap(camera = camera, store = store)
 
         CenterPin(
-            lifted = camera.isInteracting,
+            // Lifted for any movement, dragged or flown, so the pin touching down always
+            // means the coordinate below it has stopped changing.
+            lifted = camera.isInteracting || camera.isFlying,
             active = active != null,
         )
 

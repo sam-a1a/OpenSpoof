@@ -188,6 +188,9 @@ private fun DrawScope.drawTiles(
     val lastY = ceil(centerTileY + viewCenter.y / tileSpan).toInt()
         .coerceAtMost(tilesPerAxis - 1)
 
+    // Let the loader abandon downloads for tiles the camera has already left behind.
+    store.setViewport(zoomInt, firstX, lastX, firstY, lastY, tilesPerAxis)
+
     for (ty in firstY..lastY) {
         for (tx in firstX..lastX) {
             // Longitude wraps, so a column off the left edge is a real tile on the right.

@@ -15,6 +15,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.ln
 
 const val MIN_ZOOM = 2f
 
@@ -47,6 +49,10 @@ class MapCameraState(lat: Double, lon: Double, zoom: Float) {
      */
     var isInteracting by mutableStateOf(false)
         internal set
+
+    /** True while [animateTo] is flying the camera to a new place. */
+    var isFlying by mutableStateOf(false)
+        private set
 
     val latitude: Double get() = worldYToLat(centerY)
     val longitude: Double get() = worldXToLon(wrapWorldX(centerX))
@@ -152,11 +158,35 @@ class MapCameraState(lat: Double, lon: Double, zoom: Float) {
         if (toX - fromX > 0.5) toX -= 1.0
         if (fromX - toX > 0.5) toX += 1.0
 
-        AnimationState(initialValue = 0f).animateTo(1f, spec) {
-            val t = value.toDouble()
-            centerX = wrapWorldX(fromX + (toX - fromX) * t)
-            centerY = fromY + (toY - fromY) * t
-            zoom = fromZoom + (toZoom - fromZoom) * value
+        // Long journeys arc out and back in rather than crossing at the destination zoom.
+        // Flying Paris to Tokyo at street level would drag the viewport over thousands of
+        // distinct tiles, which is slow and is exactly the wide-area fetching the OSM tile
+        // policy warns against. Pulling back to a zoom where the whole trip roughly fits
+        // means the flight crosses a handful of tiles instead, and it reads better too.
+        val span = maxOf(abs(toX - fromX), abs(toY - fromY))
+        val fitZoom = if (span > 1e-9) {
+            (ln(1.0 / span) / ln(2.0)).toFloat()
+        } else {
+            MAX_ZOOM
+        }
+        val dip = (minOf(fromZoom, toZoom) - fitZoom).coerceAtLeast(0f)
+
+        isFlying = true
+        try {
+            AnimationState(initialValue = 0f).animateTo(1f, spec) {
+                val t = value.toDouble()
+                centerX = wrapWorldX(fromX + (toX - fromX) * t)
+                centerY = fromY + (toY - fromY) * t
+
+                // Parabolic dip, deepest at the midpoint and zero at both ends. Clamped so a
+                // spring overshooting past 1 does not invert it into a zoom-in spike.
+                val arc = value.coerceIn(0f, 1f)
+                zoom = fromZoom + (toZoom - fromZoom) * value - dip * 4f * arc * (1f - arc)
+            }
+        } finally {
+            // Unlike the fling flag, this must clear on cancellation too, or a interrupted
+            // flight would leave the renderer permanently refusing to fetch detail tiles.
+            isFlying = false
         }
     }
 
