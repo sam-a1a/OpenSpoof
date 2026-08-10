@@ -9,6 +9,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
@@ -38,6 +39,14 @@ class MapCameraState(lat: Double, lon: Double, zoom: Float) {
         private set
     var zoom by mutableFloatStateOf(zoom.coerceIn(MIN_ZOOM, MAX_ZOOM))
         private set
+
+    /**
+     * True from the moment a finger lands until any resulting momentum has died out. The centre
+     * pin reads this to lift off the map while it is moving, so "settled" is a state the user
+     * can see: the pin only touches down once the coordinate under it has stopped changing.
+     */
+    var isInteracting by mutableStateOf(false)
+        internal set
 
     val latitude: Double get() = worldYToLat(centerY)
     val longitude: Double get() = worldXToLon(wrapWorldX(centerX))

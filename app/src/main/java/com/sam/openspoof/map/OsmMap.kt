@@ -122,6 +122,7 @@ private suspend fun PointerInputScope.mapGestures(
         flingJob?.cancel()
         val tracker = VelocityTracker()
         awaitFirstDown(requireUnconsumed = false)
+        camera.isInteracting = true
 
         var pressed: Boolean
         do {
@@ -150,7 +151,13 @@ private suspend fun PointerInputScope.mapGestures(
         } while (pressed)
 
         val velocity = tracker.calculateVelocity()
-        flingJob = scope.launch { camera.fling(Offset(velocity.x, velocity.y), decay) }
+        flingJob = scope.launch {
+            camera.fling(Offset(velocity.x, velocity.y), decay)
+            // Deliberately not in a finally: if this fling was cancelled it is because a new
+            // gesture took over and has already set the flag back to true, and clearing it
+            // from the cancellation path would race that gesture and drop the pin mid-drag.
+            camera.isInteracting = false
+        }
     }
 }
 
