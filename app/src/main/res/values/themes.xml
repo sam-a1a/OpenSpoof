@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.OpenSpoof" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      A bare platform theme. Compose draws everything, so this only needs to avoid an
+      action bar and follow the system light/dark setting; the window background matches
+      the map surface so there is no flash before the first frame.
+      No AppCompat theme, because the app does not depend on AppCompat.
+    -->
+    <!--
+      The platform ships Theme.DeviceDefault.DayNight but no NoActionBar variant of it, so the
+      bar is switched off here. Doing it this way keeps one theme file instead of needing a
+      separate values-night copy.
+    -->
+    <style name="Theme.OpenSpoof" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>

@@ -2,6 +2,32 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Map tiles and place search. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      The permission that allows registering test location providers. It is not granted by
+      prompting the user; it only takes effect once this app is chosen under
+      Developer options > Select mock location app. Lint flags it because it is unusual in a
+      shipping app, which is exactly what this app is for.
+    -->
+    <uses-permission
+        android:name="android.permission.ACCESS_MOCK_LOCATION"
+        tools:ignore="MockLocation" />
+
+    <!--
+      Required to run the location-typed foreground service. Android 14+ verifies that one of
+      the runtime location permissions is already granted at the moment startForeground is
+      called, and throws SecurityException otherwise, so the UI requests this before starting.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- The ongoing notification is mandatory for a foreground service. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -21,6 +47,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".mock.SpoofService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
     </application>
 
 </manifest>
