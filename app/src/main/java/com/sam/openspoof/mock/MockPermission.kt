@@ -17,8 +17,10 @@ import android.provider.Settings
  */
 fun Context.isMockLocationEnabled(): Boolean {
     val appOps = getSystemService(AppOpsManager::class.java) ?: return false
+    // checkOpNoThrow, not unsafeCheckOpNoThrow: the pair was renamed to the "unsafe" spelling
+    // and then renamed back, leaving the unsafe variant deprecated on current platforms.
     val mode = runCatching {
-        appOps.unsafeCheckOpNoThrow(
+        appOps.checkOpNoThrow(
             AppOpsManager.OPSTR_MOCK_LOCATION,
             Process.myUid(),
             packageName,

@@ -39,13 +39,6 @@ fun worldYToLat(y: Double): Double = atan(sinh(PI * (1.0 - 2.0 * y))) * 180.0 / 
 /** World size in pixels at [zoom]; fractional zoom is supported. */
 fun worldPx(zoom: Float): Double = TILE_SIZE.toDouble() * Math.pow(2.0, zoom.toDouble())
 
-/**
- * Ground resolution in metres per screen pixel, used to draw the scale bar.
- * Mercator stretches with latitude, hence the cosine term.
- */
-fun metersPerPixel(lat: Double, zoom: Float): Double =
-    156543.03392804097 * cos(lat * PI / 180.0) / Math.pow(2.0, zoom.toDouble())
-
 /** Longitudes wrap, so normalise into [0,1) before converting to a tile column. */
 fun wrapWorldX(x: Double): Double = x - Math.floor(x)
 
