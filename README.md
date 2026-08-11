@@ -4,7 +4,11 @@ A small Android app for setting a mock GPS location. Pick a point on an
 OpenStreetMap map, tap **Set location**, and the device reports that position to
 every app that asks for one.
 
-Release APK is **~2.2 MB**.
+Release APK is **~2.3 MB**.
+
+Places you use often can be saved: line the pin up and tap the star. Saved
+places live behind the bookmark button next to the coordinate readout, and
+picking one flies the map back to it.
 
 ## Using it
 

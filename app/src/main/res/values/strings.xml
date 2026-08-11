@@ -25,5 +25,20 @@
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
     <string name="spoof_failed">Couldn\'t set the location. Check that OpenSpoof is still the selected mock location app.</string>
+
+    <!-- Favorites -->
+    <string name="favorites_title">Saved places</string>
+    <string name="favorites_empty">Nothing saved yet. Line up the pin on a place and tap the star to keep it.</string>
+    <string name="favorites_open">Saved places</string>
+    <string name="favorites_delete">Delete</string>
+    <string name="favorite_add">Save this place</string>
+    <string name="favorite_remove">Remove from saved places</string>
+    <string name="favorite_saved">Saved “%1$s”</string>
+    <string name="favorite_removed">Removed “%1$s”</string>
+    <string name="favorite_default_name">Pinned place</string>
+    <string name="save_title">Save this place</string>
+    <string name="save_name_label">Name</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
     <string name="permission_needed">Location and notification access are needed to keep the spoof running in the background.</string>
 </resources>

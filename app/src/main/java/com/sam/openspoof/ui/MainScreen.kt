@@ -7,11 +7,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
@@ -40,12 +44,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sam.openspoof.R
 import com.sam.openspoof.geo.Nominatim
+import com.sam.openspoof.data.FavoriteStore
 import com.sam.openspoof.geo.Place
 import com.sam.openspoof.map.GeoPoint
 import com.sam.openspoof.map.MapCameraState
@@ -83,7 +90,11 @@ fun MainScreen() {
     val spoofState by SpoofService.state.collectAsState()
     val active = spoofState as? SpoofState.Active
 
+    val favorites = remember { FavoriteStore(context) }
+
     var showEnableDialog by rememberSaveable { mutableStateOf(false) }
+    var showFavorites by rememberSaveable { mutableStateOf(false) }
+    var showSaveDialog by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Place>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
@@ -92,6 +103,11 @@ fun MainScreen() {
 
     val flySpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
     val zoomSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+
+    // While spoofing, the readout and the save button describe the position actually being
+    // broadcast, not wherever the user has since panned the map to.
+    val shownPoint = active?.point ?: GeoPoint(camera.latitude, camera.longitude)
+    val savedHere = favorites.at(shownPoint.lat, shownPoint.lon)
 
     fun beginSpoof() {
         SpoofService.start(context, GeoPoint(camera.latitude, camera.longitude))
@@ -235,15 +251,77 @@ fun MainScreen() {
         ) {
             SnackbarHost(hostState = snackbars) { Snackbar(it) }
 
-            CoordinateReadout(
-                // While spoofing, the readout describes the position actually being broadcast,
-                // not wherever the user has since panned the map to.
-                point = active?.point ?: GeoPoint(camera.latitude, camera.longitude),
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ControlButton(
+                    icon = R.drawable.ic_bookmarks,
+                    contentDescription = stringResource(R.string.favorites_open),
+                    onClick = { showFavorites = true },
+                )
+
+                CoordinateReadout(point = shownPoint)
+
+                SaveButton(
+                    saved = savedHere != null,
+                    onClick = {
+                        val existing = savedHere
+                        if (existing == null) {
+                            showSaveDialog = true
+                        } else {
+                            favorites.remove(existing)
+                            scope.launch {
+                                snackbars.showSnackbar(
+                                    context.getString(R.string.favorite_removed, existing.name),
+                                )
+                            }
+                        }
+                    },
+                )
+            }
 
             PrimaryAction(
                 active = active != null,
                 onClick = { if (active != null) SpoofService.stop(context) else requestSpoof() },
+            )
+        }
+
+        if (showFavorites) {
+            FavoritesSheet(
+                favorites = favorites.items,
+                onPick = { favorite ->
+                    showFavorites = false
+                    // Mirrors picking a search result: fly there and leave broadcasting to
+                    // the same deliberate button press as everywhere else.
+                    query = favorite.name
+                    results = emptyList()
+                    searchMessage = null
+                    scope.launch { camera.animateTo(favorite.lat, favorite.lon, 16f, flySpec) }
+                },
+                onDelete = { favorites.remove(it) },
+                onDismiss = { showFavorites = false },
+            )
+        }
+
+        if (showSaveDialog) {
+            SaveFavoriteDialog(
+                lat = shownPoint.lat,
+                lon = shownPoint.lon,
+                // Whatever was searched to get here is almost always the right name.
+                suggestion = query.trim().ifEmpty {
+                    stringResource(R.string.favorite_default_name)
+                },
+                onSave = { name ->
+                    favorites.add(name, shownPoint.lat, shownPoint.lon)
+                    showSaveDialog = false
+                    scope.launch {
+                        snackbars.showSnackbar(
+                            context.getString(R.string.favorite_saved, name.trim()),
+                        )
+                    }
+                },
+                onDismiss = { showSaveDialog = false },
             )
         }
 
@@ -323,6 +401,70 @@ private fun PrimaryAction(active: Boolean, onClick: () -> Unit) {
                     contentDescription = null,
                 )
             }
+        },
+    )
+}
+
+/** A round map control, styled to match the coordinate pill it sits beside. */
+@Composable
+private fun ControlButton(
+    icon: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+    tint: Color = LocalContentColor.current,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp,
+    ) {
+        IconButton(onClick = onClick) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = contentDescription,
+                tint = tint,
+            )
+        }
+    }
+}
+
+/**
+ * Star toggle for the position under the pin.
+ *
+ * Filling the star is the whole feedback for saving, so it gets a spring that overshoots and
+ * settles rather than a fade; the colour underneath moves on the effects track, which does not
+ * overshoot, because a colour spring would travel past the target hue.
+ */
+@Composable
+private fun SaveButton(saved: Boolean, onClick: () -> Unit) {
+    val scale by animateFloatAsState(
+        targetValue = if (saved) 1f else 0.88f,
+        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+        label = "starScale",
+    )
+    val tint by animateColorAsState(
+        targetValue = if (saved) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+        label = "starTint",
+    )
+
+    ControlButton(
+        icon = if (saved) R.drawable.ic_star_filled else R.drawable.ic_star_outline,
+        contentDescription = stringResource(
+            if (saved) R.string.favorite_remove else R.string.favorite_add,
+        ),
+        onClick = onClick,
+        tint = tint,
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
         },
     )
 }
